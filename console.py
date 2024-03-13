@@ -1,277 +1,189 @@
 #!/usr/bin/python3
 """
-Contains comand line interpreter
+Defines the HBNBCommand class
 """
-from models.base_model import BaseModel
-from models.user import User
-from models.__init__ import storage
+
 import cmd
-from models.place import Place
+from signal import signal, SIGINT
+from sys import exit
+from models.base_model import BaseModel
+import models
+import shlex
+from models.user import User
 from models.state import State
 from models.city import City
 from models.amenity import Amenity
+from models.place import Place
 from models.review import Review
 
-
 class HBNBCommand(cmd.Cmd):
-    '''
-    HBNBCommand - class containing functions and attributes of the console
-    Attributes:
-             prompt - The string to be displayed as the prompt
-             __classes - Contains a dictionary of all classes
-             __types - contains a dictionary of attributes and their values
-                      to be abe to parse rge during the update method
-    Methods:
-            do_quit() - implements quit command
-            do_EOF() - Takes care of EOF in the command buffer
-            emptyline - Method called when an empty line is entered in
-                       response to the prompt.
-                       If this method is not overridden,
-                       it repeats the last nonempty command entered.
+    """
+    Entry point of the command interpreter
+    """
+    prompt = "(hbnb)"
+    allowed_classes = [
+        "BaseModel", "User", "State", "City", "Amenity", "Place", "Review"
+        ]
 
-    '''
-    prompt = "(hbnb) "
-    __classes = {
-               'BaseModel': BaseModel, 'User': User, 'Place': Place,
-               'State': State, 'City': City, 'Amenity': Amenity,
-               'Review': Review
-              }
-    # This is a dictionary of attributes and their values so that we can
-    # properly parse them during the update method
-    __types = {
-                "number_rooms": int, "number_bathrooms": int,
-                "max_guest": int, "price_by_night": int,
-                "latitude": float, "longitude": float
-            }
-
-    def do_quit(self, args):
-        '''
-        Implements quit command
-        Args:
-            args - string containing arguments
-        '''
-        raise SystemExit
-
-    def do_EOF(self, args):
-        '''
-        do_EOF() - Takes care of EOF in the command buffer
-        Args:
-           args - stream from the standard input
-        '''
+    def do_quit(self, *args):
+        """Quit command to exit the program."""
         return True
-        print("Quit command to exit the program")
-        print()
+
+    def do_EOF(self, *args):
+        """Exit the program"""
+        return True
 
     def emptyline(self):
-        '''
-         emptyline - Method called when an empty line is entered in
-                       response to the prompt.
-                    If this method is not overridden,
-                    it repeats the last nonempty command entered.
-        '''
+        """Empty line"""
         pass
 
-    def do_create(self, arg):
-        '''
-        do_create - Creates a new instance of BaseModel and
-        saves it to Json file and prints the id
-        '''
-        if not arg:
-            print("** class name missing **")
-        elif arg not in HBNBCommand.__classes:
-            print("** class doesn't exist **")
+    def handler(signal_received, frame):
+        """Handle the SIGINT or CTRL-C signal"""
+        print("^C")
+        exit(0)
+
+    def do_create(self, args):
+        """
+        Create a new instance of a class
+        """
+        #Check if a class name is supplied as the argument.
+        if len(args) == 0:
+            self.err_handler(1)
         else:
-            model_1 = HBNBCommand.__classes[arg]()
-            model_1.save()
-            print(model_1.id)
-
-    def do_show(self, arg):
-        '''
-        do__show - prints the string rep of an instance\
-        based on the class name and the id
-        '''
-        args = arg.split()
-        '''
-        Check if the class name has\
-        been passed and whether it exists
-        '''
-        try:
-            obj = args[0]
-            if obj not in HBNBCommand.__classes:
-                print("** class doesn't exist **")
-                return
-
-        except:
-            print("** class name missing **")
-            return
-
-        try:
-            id = args[1]
-        except:
-            print("** instance id missing **")
-            return
-
-        key = obj + "." + str(id)
-        new_dict = storage.all()
-
-        try:
-            print(new_dict[key])
-        except Exception as e:
-            print("** no instance found **")
-
-    def do_destroy(self, arg):
-        '''
-        do_destroy - Destroys an Object based on the class name and id
-        '''
-        args = arg.split()
-        # Check if the class name has been passed and whether it exists
-        try:
-            obj = args[0]
-            if obj not in HBNBCommand.__classes:
-                print("** class doesn't exist **")
-                return
-        except:
-            print("** class name missing **")
-            return
-
-        try:
-            id = args[1]
-        except:
-            print("** instance id missing **")
-            return
-
-        key = obj + "." + str(id)
-        stored_objs = storage.all()
-
-        try:
-            del(stored_objs[key])
-            storage.save()
-        except Exception as e:
-            print("** no instance found **")
-
-    def do_all(self, arg):
-        '''
-        Prints all string representation of all instances based or not on
-        the class name.
-        '''
-        obj_dict = storage.all()
-        obj_list = []
-        if not arg:
-            for obj in obj_dict.values():
-                obj_list.append(str(obj))
-            print(obj_list)
-        else:
-            if arg not in HBNBCommand.__classes:
-                print("** class doesn't exist **")
+            args = args.split()
+            if args[0] in self.allowed_classes:
+                #Create a new instance of the class
+                new_instance = eval(args[0])(args[1:])
+                print(new_instance.id)
+                new_instance.save()
             else:
-                for k, obj in obj_dict.items():
-                    if arg in k:
-                        obj_list.append(str(obj))
-                print(obj_list)
+                self.err_handler(2)
 
-    def do_update(self, arg):
-        '''
-        updates an instnace based on the class na,e and id by adding
-        or updating attribute(saving the chanege into JSON file
-        '''
-        args = arg.split()
-        try:
-            class_name = args[0]
-            if class_name not in HBNBCommand.__classes:
-                print("** class doesn't exist **")
-                return
-        except:
-            print("** class name missing **")
-            return
-
-        try:
-            id = args[1]
-            key = class_name + "." + str(id)
-            if key not in storage.all():
-                print("** no instance found **")
-                return
-        except:
-            print("** instance id missing **")
-            return
-
-        try:
-            attribute = args[2]
-        except:
-            print("** attribute name missing **")
-            return
-
-        try:
-            value = args[3]
-        except:
-            print("** value missing **")
-            return
-
-        # Properly parse the value
-        if "\"" in value:
-            value = value[1:-1]
+    def do_show(self, args):
+        """
+         Prints the string representation of an instance based on the class name
+        and id
+        """
+        if len(args) == 0:
+            self.err_handler(1)
+        elif len(args) == 1:
+            self.err_handler(3)
         else:
-            value = HBNBCommand.__types[attribute](value)
+            args = args.split()
+            if args[0] in self.allowed_classes:
+                models.storage.reload()
+                #Create an identifier based on user input.
+                identifier = args[0] + "." + args[1]
+                if identifier in list(models.storage.all().keys()):
+                    print(models.storage.all()[identifier])
+                else:
+                    self.err_handler(4)
+            else:
+                self.err_handler(2)
 
-        obj = storage.all()[key]
-        setattr(obj, attribute, value)
-        obj.save()
 
-        # Help functions
-        def help_create(self):
-            '''
-            Help for the create method
-            '''
-            print("Creates a new instance of BaseModel,"
-                  "saves it (to the JSON file)and prints the id. Ex:"
-                  "$ create BaseModel")
+    def do_destroy(self, args):
+        """
+        Deletes an instance based on the class name and id
+        """
+        args = args.split()
+        if len(args) == 0:
+            self.err_handler(1)
+        elif len(args) == 1:
+            if args[0] in self.allowed_classes:
+                self.err_handler(3)
+            else:
+                self.err_handler(2)
+        else:
+            if args[0] in self.allowed_classes:
+                models.storage.reload()
+                identifier = args[0] + "." + args[1]
+                if identifier in list(models.storage.all().keys()):
+                    del models.storage.all()[identifier]
+                    models.storage.save()
+                else:
+                    self.err_handler(4)
+            else:
+                self.err_handler(2)
 
-        def help_show(self):
-            '''
-            Help for the show method
-            '''
-            print("show -  Prints the string representation of an instance\
-            based on the class name and id.\
-            Ex: $ show BaseModel 1234-1234-1234.")
 
-        def help_destroy(self):
-            '''
-            Help for the destroy
-            '''
-            print("destroy - Deletes an instance based on the class name and id\
-            (save the change into the JSON file).\
-            Ex: $ destroy BaseModel 1234-1234-1234.\
-    help_EOF = help_quit")
+    def do_all(self, args):
+        """
+        Prints all string representation of all instances
+        based or not on the class name.
+        """
+        str_list = []
+        #If length is zero, print all instances.
+        if len(args) == 0:
+            all_dict = models.storage.all()
+            for id in all_dict.keys():
+                obj = all_dict[id]
+                str_list.append(str(obj))
+            print(str_list)
+        else:
+            models.storage.reload()
+            args = args.split()
+            if args[0] in self.allowed_classes:
+                all_dict = models.storage.all()
+                for id in all_dict.keys():
+                    if args[0] in id:
+                        obj = all_dict[id]
+                        str_list.append(str(obj))
+                print(str_list)
+            else:
+                self.err_handler(2)
 
-        def help_all(self):
-            '''
-            Help for the all method
-            '''
-            print("all - Prints all string representation of all instances\
-            based or not on the class name. Ex: $ all BaseModel or $ all.")
 
-        def help_update(self):
-            '''
-            Help for the update method
-            '''
-            print(" Updates an instance based on the class name and id\
-            by adding or updating attribute\
-            (save the change into the JSON file).\
-            Ex: $ update BaseModel 1234-1234-1234\
-            email 'aibnb@holbertonschool.com'.")
+    def do_update(self, args):
+        """
+        Updates an instance based on the class name and id
+        by adding or updating attribute
+        """
+        args = shlex.split(args)
+        if len(args) == 0:
+            self.err_handler(1)
+        elif len(args) == 1:
+            if args[0] in self.allowed_classes:
+                self.err_handler(3)
+            else:
+                self.err_handler(2)
+        else:
+            if args[0] in self.allowed_classes:
+                models.storage.reload()
+                identifier = args[0] + "." + args[1]
+                if identifier in list(models.storage.all().keys()):
+                    if len(args) == 2:
+                        self.err_handler(5)
+                    elif len(args) == 3:
+                        self.err_handler(6)
+                    else:
+                        attr = args[2]
+                        value = args[3]
+                        setattr(models.storage.all()[identifier],attr, value)
+                        models.storage.all()[identifier].save()
+                else:
+                    self.err_handler(4)
+            else:
+                self.err_handler(2)
 
-        def help_quit(self):
-            '''
-            Implements help for quit method
-            '''
-            print("Quit command to exit the program")
-            print()
 
-        def help_EOF(self):
-            '''
-            Implements help for quit method
-            '''
-            print("Quit command to exit the program")
-            print()
 
-if __name__ == '__main__':
+
+
+    def err_handler(self, error_num):
+        """Handles errors in the progrm"""
+        if error_num == 1:
+            print("** class name missing **")
+        elif error_num == 2:
+            print("** class doesn't exist **")
+        elif error_num == 3:
+            print("** instance id missing **")
+        elif error_num == 4:
+            print("** no instance found **")
+        elif error_num == 5:
+            print("** attribute name missing **")
+        elif error_num == 6:
+            print("** value missing **")
+if __name__ == "__main__":
+    signal(SIGINT, HBNBCommand.handler)
     HBNBCommand().cmdloop()
